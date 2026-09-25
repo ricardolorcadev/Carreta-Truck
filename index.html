@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pátio da Carreta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#15171b; --panel:#1f2228; --line:#30343c; --ink:#eef0f2; --muted:#9aa1ad;
+    --yellow:#f2c230; --green:#3ddc97; --orange:#ff9f43; --red:#ff5a4e; --blue:#5fd3ff;
+  }
+  [hidden]{display:none!important}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--ink);font:15px/1.45 Barlow,system-ui,sans-serif;margin:0;
+    padding-inline:16px;padding-block:16px 24px;box-sizing:border-box}
+  .wrap{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+  header{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:8px 16px}
+  h1{font:700 30px/1 "Barlow Condensed",sans-serif;margin:0;letter-spacing:.02em;text-transform:uppercase}
+  h1 span{color:var(--yellow)}
+  .task{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);
+    border-radius:6px;padding:8px 12px;font:600 18px/1.1 "Barlow Condensed",sans-serif;letter-spacing:.03em;text-transform:uppercase}
+  .task .dir{padding:3px 8px;border-radius:3px;color:#111}
+  .dir.frente{background:var(--green)} .dir.re{background:var(--orange)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+  .stat small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .stat b{font:600 20px/1.2 "Barlow Condensed",sans-serif;font-variant-numeric:tabular-nums}
+  .ok{color:var(--green)} .warn{color:var(--orange)} .bad{color:var(--red)}
+  .wheel{height:6px;background:var(--line);border-radius:3px;position:relative;margin-top:9px}
+  .wheel i{position:absolute;top:-3px;width:12px;height:12px;border-radius:50%;background:var(--yellow);transform:translateX(-50%);left:50%}
+  .stage{position:relative;width:100%;aspect-ratio:4/3;max-width:100%;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    text-align:center;background:rgba(15,17,20,.8);padding:20px}
+  .overlay h2{font:700 34px/1 "Barlow Condensed",sans-serif;text-transform:uppercase;margin:0;letter-spacing:.03em}
+  .overlay p{margin:0;color:#cfd3da;max-width:44ch}
+  .overlay .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  button{font:700 16px "Barlow Condensed",sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+    border-radius:5px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:10px 18px}
+  button.primary{background:var(--yellow);color:#15171b;border-color:var(--yellow)}
+  button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+  .pad{display:flex;justify-content:space-between;gap:12px;user-select:none;-webkit-user-select:none}
+  .pad div{display:flex;gap:10px}
+  .pad button{min-width:64px;height:58px;font-size:18px;touch-action:none}
+  .pad button.on{background:var(--yellow);color:#15171b}
+  .opts{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+  .opts label{display:flex;align-items:center;gap:6px;color:var(--muted)}
+  select{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px 8px}
+  .help{color:var(--muted);font-size:14px;margin:0;max-width:75ch}
+  .help b{color:var(--ink);font-weight:600}
+  .chip{display:inline-block;padding:0 6px;border-radius:3px;color:#111;font-weight:600;font-size:12px}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Pátio da <span>Carreta</span></h1>
+    <div class="task" id="task">Doca 07 <span class="dir re">De ré</span></div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><small>Marcha</small><b id="gear">N</b></div>
+    <div class="stat"><small>Velocidade</small><b id="spd">0 km/h</b></div>
+    <div class="stat"><small>Giro</small><b id="rpm">– rpm</b></div>
+    <div class="stat"><small>Volante</small><div class="wheel"><i id="knob"></i></div></div>
+    <div class="stat"><small>Articulação</small><b id="art">0°</b></div>
+    <div class="stat"><small>Dentro da vaga</small><b id="ins">0/8</b></div>
+    <div class="stat"><small>Alinhamento</small><b id="ali">–</b></div>
+    <div class="stat"><small>Tempo · Manobras</small><b id="tm">0s · 0</b></div>
+  </div>
+
+  <div class="stage">
+    <canvas id="cv"></canvas>
+    <div class="overlay" id="ov">
+      <h2 id="ovT">Pátio da Carreta</h2>
+      <p id="ovP"></p>
+      <div class="btns" id="ovB"></div>
+    </div>
+  </div>
+
+  <div class="pad">
+    <div><button id="bL" aria-label="Volante para a esquerda">◀</button><button id="bR" aria-label="Volante para a direita">▶</button></div>
+    <div><button id="bK" aria-label="Frear">■ Freio</button><button id="bF" aria-label="Acelerar para frente">▲ Frente</button><button id="bB" aria-label="Dar ré">▼ Ré</button></div>
+  </div>
+
+  <div class="opts">
+    <label for="mode">Tipo de vaga
+      <select id="mode">
+        <option value="rand">Aleatório</option>
+        <option value="frente">Sempre de frente</option>
+        <option value="re">Sempre de ré</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="optPath" checked> Mostrar trajetória prevista</label>
+    <label><input type="checkbox" id="optGuide" checked> Linha de centro da vaga</label>
+    <button id="btnNew">Nova vaga</button>
+  </div>
+
+  <div class="opts">
+    <label><input type="checkbox" id="optSound" checked> Som</label>
+    <label for="engine">Motor
+      <select id="engine">
+        <option value="v8">V8 grave (tipo Scania)</option>
+        <option value="six">6 cilindros turbo (tipo Mercedes)</option>
+        <option value="old">Diesel antigo, bem batido</option>
+      </select>
+    </label>
+    <label for="optBlow">Turbo ao soltar
+      <select id="optBlow">
+        <option value="valve">Com válvula de alívio (pssh)</option>
+        <option value="spool">Original: só a turbina descendo</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="optBeep" checked> Bip de ré</label>
+    <label for="vol">Volume <input type="range" id="vol" min="0" max="100" value="60"></label>
+  </div>
+
+  <p class="help"><b>Como jogar:</b> setas ↑ ↓ aceleram para frente e de ré, ← → giram o volante (ele volta ao centro sozinho), <b>espaço</b> freia. R reinicia, N sorteia outra vaga.
+    A vaga indica o sentido: <span class="chip" style="background:var(--green)">FRENTE</span> é onde fica a cabine do caminhão, <span class="chip" style="background:var(--orange)">TRASEIRA</span> é onde fica a porta da carreta.
+    Pare com tudo dentro das faixas e alinhado. <b>Dica de ré:</b> a traseira da carreta vai para o lado contrário do volante. Gire pouco e corrija cedo.</p>
+</div>
+
+<script>
+// ---------- medidas em metros ----------
+const WORLD_W=80, WORLD_H=60;
+const L1=3.8, C=0.3, L2=10.5;          // entre-eixos do cavalo, quinta roda, pino-rei até eixo da carreta
+const TR_F=4.6, TR_B=1.2, TR_W=2.5;     // cavalo: frente/traseira a partir do eixo traseiro
+const TL_F=1.2, TL_B=12.3, TL_W=2.6;    // carreta: a partir do pino-rei
+const BAYS=14, BAY_W=5.5, BAY_X0=1.5, BAY_TOP=0.8, BAY_BOT=20;
+const MAX_STEER=0.6, JACK=75*Math.PI/180;
+
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let scale=10;
+
+function resize(){
+  const r=cv.getBoundingClientRect(), d=window.devicePixelRatio||1;
+  cv.width=Math.round(r.width*d); cv.height=Math.round(r.height*d);
+  scale=cv.width/WORLD_W;
+}
+addEventListener('resize',resize);
+
+const wrap=a=>((a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
+const deg=a=>Math.round(a*180/Math.PI);
+
+// ---------- geometria ----------
+function boxPoly(x,y,a,f,b,w){
+  const c=Math.cos(a),s=Math.sin(a),h=w/2;
+  return [[f,h],[f,-h],[-b,-h],[-b,h]].map(([u,v])=>({x:x+u*c-v*s,y:y+u*s+v*c}));
+}
+const kingpin=st=>({x:st.P.x+C*Math.cos(st.th),y:st.P.y+C*Math.sin(st.th)});
+const tractorPoly=st=>boxPoly(st.P.x,st.P.y,st.th,TR_F,TR_B,TR_W);
+const trailerPoly=st=>{const k=kingpin(st);return boxPoly(k.x,k.y,st.ph,TL_F,TL_B,TL_W)};
+function overlap(A,B){
+  for(const poly of [A,B]) for(let i=0;i<poly.length;i++){
+    const p=poly[i],q=poly[(i+1)%poly.length],ax=p.y-q.y,ay=q.x-p.x;
+    let a1=Infinity,a2=-Infinity,b1=Infinity,b2=-Infinity;
+    for(const v of A){const d=v.x*ax+v.y*ay;a1=Math.min(a1,d);a2=Math.max(a2,d)}
+    for(const v of B){const d=v.x*ax+v.y*ay;b1=Math.min(b1,d);b2=Math.max(b2,d)}
+    if(a2<b1||b2<a1)return false;
+  }
+  return true;
+}
+const rect=(x1,y1,x2,y2)=>[{x:x1,y:y1},{x:x2,y:y1},{x:x2,y:y2},{x:x1,y:y2}];
+const WALLS=[rect(-10,-10,90,BAY_TOP),rect(-10,WORLD_H,90,70),rect(-10,-10,0,70),rect(WORLD_W,-10,90,70)];
+const bayX=i=>BAY_X0+i*BAY_W;
+
+// ---------- cenário ----------
+let scen, st, game='ready', keys={}, timer=0, moves=0, lastDir=0, holdOk=0;
+
+function newScenario(){
+  const m=$('mode').value;
+  const mode=m==='rand'?(Math.random()<.5?'frente':'re'):m;
+  const target=2+Math.floor(Math.random()*(BAYS-4));
+  const parked=[];
+  for(let i=0;i<BAYS;i++){
+    if(i===target)continue;
+    if(mode==='frente'&&Math.abs(i-target)<=2)continue;
+    if(Math.random()<.65){
+      const cx=bayX(i)+BAY_W/2;
+      const full=Math.random()<.35;
+      const K={x:cx,y:BAY_TOP+0.3+TL_B};
+      const p={full,cab:['#6f7a86','#3f78c9','#d98a2b','#4f9a6a'][i%4],
+        st:{P:{x:cx,y:K.y-C},th:Math.PI/2,ph:Math.PI/2,steer:0}};
+      parked.push(p);
+    }
+  }
+  const fromLeft=Math.random()<.5;
+  scen={mode,target,parked,start:fromLeft?{x:18,y:46,th:0}:{x:62,y:46,th:Math.PI},
+    obst:[...WALLS,...parked.flatMap(p=>p.full?[trailerPoly(p.st),tractorPoly(p.st)]:[trailerPoly(p.st)])]};
+  resetRig();
+  updateTask();
+}
+function resetRig(){
+  const s=scen.start;
+  st={P:{x:s.x,y:s.y},th:s.th,ph:s.th,v:0,steer:0};
+  timer=0;moves=0;lastDir=0;holdOk=0;gear=1;shiftT=0;engR=0;
+}
+function updateTask(){
+  const n=String(scen.target+1).padStart(2,'0');
+  const fr=scen.mode==='frente';
+  $('task').innerHTML=`Doca ${n} <span class="dir ${fr?'frente':'re'}">${fr?'De frente':'De ré'}</span>`;
+}
+
+// ---------- física ----------
+function physics(dt){
+  const fwd=keys.up, back=keys.down, v0=st.v;
+  shiftT=Math.max(0,shiftT-dt);
+  if(keys.brake){ const d=8*dt; st.v=Math.abs(st.v)<d?0:st.v-Math.sign(st.v)*d; }
+  else if(fwd){ st.v += (st.v<-0.1?7:shiftT>0?0.05:ACC[gear-1])*dt; }   // durante a troca o câmbio corta a força
+  else if(back){ st.v -= (st.v>0.1?7:1.8)*dt; }
+  else { const d=1.4*dt; st.v=Math.abs(st.v)<d?0:st.v-Math.sign(st.v)*d; }
+  st.v=Math.max(-2.5,Math.min(TOPS[TOPS.length-1],st.v));
+  // câmbio automático
+  if(shiftT===0){
+    if(fwd&&gear<TOPS.length&&st.v>=TOPS[gear-1]*0.97){gear++;shiftT=0.35;audio.shift()}
+    else if(gear>1&&st.v<TOPS[gear-2]*0.7)gear--;
+  }
+  if(st.v<=0.05)gear=1;
+  // giro do motor (0 = marcha lenta, 1 = giro máximo)
+  let r=st.v<-0.05?Math.abs(st.v)/2.6:Math.max(0,st.v)/TOPS[gear-1];
+  if((fwd||back)&&!keys.brake)r=Math.max(r,.3);
+  engR=Math.min(1,r);
+  if(keys.left) st.steer-=1.1*dt;
+  else if(keys.right) st.steer+=1.1*dt;
+  else { const d=0.7*dt; st.steer=Math.abs(st.steer)<d?0:st.steer-Math.sign(st.steer)*d; }
+  st.steer=Math.max(-MAX_STEER,Math.min(MAX_STEER,st.steer));
+  const dir=Math.abs(st.v)>0.25?Math.sign(st.v):0;
+  if(dir&&lastDir&&dir!==lastDir)moves++;
+  if(dir)lastDir=dir;
+  // chiado do freio a ar quando a carreta para
+  peakV=Math.max(peakV,Math.abs(st.v));
+  const stopped=Math.abs(st.v)<0.05||Math.sign(st.v)!==Math.sign(v0);
+  if(stopped&&peakV>0.8){audio.hiss(Math.min(1,0.45+peakV/5));peakV=0}
+  else if(Math.abs(st.v)<0.05)peakV=0;
+  integrate(st,dt);
+}
+let peakV=0, gear=1, shiftT=0, engR=0;
+const TOPS=[7,13,20,27,34,40].map(k=>k/3.6);   // velocidade máxima de cada marcha (km/h → m/s)
+const ACC=[2.6,2.4,2.2,2.0,1.8,1.6];            // força de cada marcha (m/s²)
+
+// ---------- som (Web Audio, sem arquivos) ----------
+// cyl: cilindros · idle/max: rpm · punch: força das explosões · lump: irregularidade (V8)
+// clat: batida dos bicos injetores · lp: abertura do escapamento · turbo: assobio
+const ENGINES={
+  v8:{cyl:8,idle:550,max:1900,punch:1.1,lump:.55,body:.35,clat:.025,lp:170,lpSpan:520,turbo:.035,vol:.9},
+  six:{cyl:6,idle:600,max:2100,punch:.9,lump:.12,body:.25,clat:.05,lp:220,lpSpan:700,turbo:.05,vol:.85},
+  old:{cyl:6,idle:480,max:1800,punch:1.2,lump:.25,body:.2,clat:.11,lp:260,lpSpan:650,turbo:.02,vol:.8}
+};
+const audio=(()=>{
+  let ac=null,master,noise,eng=null,beepG,rpm=0,beepT=0,prevThr=0,thrHeld=0,boost=0;
+  function init(){
+    if(ac){if(ac.state==='suspended')ac.resume();return}
+    try{ac=new(window.AudioContext||window.webkitAudioContext)()}catch(e){return}
+    master=ac.createGain();master.connect(ac.destination);setVol();
+    noise=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate);
+    const d=noise.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    const bo=ac.createOscillator();bo.type='square';bo.frequency.value=1050;
+    beepG=ac.createGain();beepG.gain.value=0;bo.connect(beepG).connect(master);bo.start();
+    build();
+  }
+  function setVol(){if(master)master.gain.value=$('vol').value/100}
+  function build(){
+    if(!ac)return;
+    if(eng)eng.stop();
+    const p=ENGINES[$('engine').value];
+    // curva que transforma um seno em pulsos curtos = uma explosão por ciclo
+    const pulseCurve=new Float32Array(1024);
+    for(let i=0;i<1024;i++){const x=i/511.5-1;pulseCurve[i]=x>0?Math.pow(x,7):0}
+    const mkPulse=()=>{const o=ac.createOscillator();o.type='sine';const s=ac.createWaveShaper();s.curve=pulseCurve;o.connect(s);return {o,s}};
+    const fire=mkPulse(), fire2=mkPulse();          // explosões + irregularidade a cada 2
+    const nz=ac.createBufferSource();nz.buffer=noise;nz.loop=true;
+    // "tum-tum" das explosões: ruído grave aberto pelos pulsos
+    const nlp=ac.createBiquadFilter();nlp.type='lowpass';nlp.frequency.value=420;
+    const vca=ac.createGain();vca.gain.value=.08;
+    const pg=ac.createGain();pg.gain.value=p.punch;const pg2=ac.createGain();pg2.gain.value=p.lump;
+    fire.s.connect(pg).connect(vca.gain);fire2.s.connect(pg2).connect(vca.gain);
+    nz.connect(nlp).connect(vca);
+    // corpo grave do motor
+    const body=ac.createOscillator();body.type='sine';const bg=ac.createGain();bg.gain.value=p.body;
+    const sub=ac.createOscillator();sub.type='triangle';const sg=ac.createGain();sg.gain.value=p.body*.8;
+    body.connect(bg);sub.connect(sg);
+    // escapamento (filtro grave ressonante)
+    const mix=ac.createGain();vca.connect(mix);bg.connect(mix);sg.connect(mix);
+    const elp=ac.createBiquadFilter();elp.type='lowpass';elp.Q.value=4;
+    const out=ac.createGain();out.gain.value=0;
+    mix.connect(elp).connect(out).connect(master);
+    // "tec-tec" dos bicos injetores
+    const cbp=ac.createBiquadFilter();cbp.type='bandpass';cbp.frequency.value=2800;cbp.Q.value=2;
+    const cv=ac.createGain();cv.gain.value=0;const cg=ac.createGain();cg.gain.value=p.clat;
+    fire.s.connect(cg).connect(cv.gain);nz.connect(cbp).connect(cv).connect(out);
+    // turbina: assobio principal + harmônico + "ar" soprando na mesma nota
+    const tb=ac.createOscillator();tb.type='sine';
+    const tb2=ac.createOscillator();tb2.type='sine';const tg2=ac.createGain();tg2.gain.value=.25;
+    const tbp=ac.createBiquadFilter();tbp.type='bandpass';tbp.Q.value=14;
+    const tng=ac.createGain();tng.gain.value=2.2;
+    const vib=ac.createOscillator();vib.frequency.value=5.5;const vg=ac.createGain();vg.gain.value=18;vib.connect(vg);vg.connect(tb.frequency);
+    const tg=ac.createGain();tg.gain.value=0;
+    tb.connect(tg);tb2.connect(tg2).connect(tg);nz.connect(tbp).connect(tng).connect(tg);tg.connect(master);
+    const oscs=[fire.o,fire2.o,body,sub,nz,tb,tb2,vib];
+    oscs.forEach(o=>o.start());
+    eng={p,fire:fire.o,fire2:fire2.o,body,sub,pg,elp,out,tb,tb2,tbp,tg,
+      stop(){try{oscs.forEach(o=>o.stop())}catch(e){}out.disconnect();tg.disconnect()}};
+  }
+  function update(dt){
+    if(!ac||!eng)return;
+    const t=ac.currentTime,p=eng.p,on=$('optSound').checked&&game==='play';
+    const thr=(keys.up||keys.down)&&!keys.brake?1:0;
+    // pressão do turbo: enche devagar sob carga (turbo lag) e esvazia devagar ao soltar
+    const bT=thr&&shiftT===0?Math.min(1,.25+rpm*1.2):0;
+    boost+=(bT-boost)*Math.min(1,dt*(bT>boost?.9:.75));
+    // soltou o acelerador com pressão alta → válvula de alívio
+    if(thr)thrHeld+=dt;
+    else{ if(prevThr&&thrHeld>.5&&boost>.3&&on&&$('optBlow').value==='valve')blowOff(Math.min(1,boost*1.2)); thrHeld=0; }
+    prevThr=thr;
+    rpm+=(engR-rpm)*Math.min(1,dt*(engR>rpm?3:6));   // giro segue o câmbio; cai rápido na troca
+    const r=p.idle+(p.max-p.idle)*rpm, f=r/60*p.cyl/2;         // frequência das explosões
+    eng.fire.frequency.setTargetAtTime(f,t,.06);eng.fire2.frequency.setTargetAtTime(f/2,t,.06);
+    eng.body.frequency.setTargetAtTime(f,t,.06);eng.sub.frequency.setTargetAtTime(f/2,t,.06);
+    eng.pg.gain.setTargetAtTime(p.punch*(.7+.6*thr),t,.1);
+    eng.elp.frequency.setTargetAtTime(p.lp+p.lpSpan*rpm+120*thr,t,.08);
+    eng.out.gain.setTargetAtTime(on?p.vol*(.6+.4*rpm):0,t,.1);
+    const wf=2400+4600*boost;                       // nota do assobio segue a rotação da turbina
+    eng.tb.frequency.setTargetAtTime(wf,t,.08);eng.tb2.frequency.setTargetAtTime(wf*2.02,t,.08);
+    eng.tbp.frequency.setTargetAtTime(wf*.97,t,.08);
+    eng.tg.gain.setTargetAtTime(on?p.turbo*Math.pow(boost,1.4)*(thr?1:.85):0,t,.08);
+    const rev=on&&$('optBeep').checked&&st.v<-0.05;
+    if(rev){beepT+=dt}else beepT=0;
+    beepG.gain.setTargetAtTime(rev&&(beepT%1)<.45?.08:0,t,.01);
+  }
+  function hiss(s=1){
+    if(!ac||!$('optSound').checked)return;
+    const t=ac.currentTime;
+    const layer=(type,freq,q,peak)=>{
+      const src=ac.createBufferSource();src.buffer=noise;
+      const f=ac.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;
+      const g=ac.createGain();g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(peak*s,t+.02);g.gain.setValueAtTime(peak*s,t+.2);
+      g.gain.exponentialRampToValueAtTime(.001,t+1.4);
+      src.connect(f).connect(g).connect(master);src.start(t);src.stop(t+1.5);
+    };
+    layer('highpass',2600,.7,.55);   // "tsss" agudo do ar escapando
+    layer('bandpass',1100,1.2,.25);  // corpo do "pssh"
+  }
+  // "pssshh" da válvula de alívio: ar pressurizado saindo, com leve vibração da válvula
+  function blowOff(s){
+    const t=ac.currentTime;
+    const src=ac.createBufferSource();src.buffer=noise;
+    const hp=ac.createBiquadFilter();hp.type='highpass';hp.frequency.value=900;
+    const bp=ac.createBiquadFilter();bp.type='bandpass';bp.Q.value=1.4;
+    bp.frequency.setValueAtTime(2600,t);bp.frequency.exponentialRampToValueAtTime(1000,t+.7);
+    const g=ac.createGain();g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(.45*s,t+.02);g.gain.setValueAtTime(.45*s,t+.12);
+    g.gain.exponentialRampToValueAtTime(.001,t+.85);
+    const fl=ac.createOscillator(),fg=ac.createGain();fl.frequency.value=22;fg.gain.value=.12*s;fl.connect(fg).connect(g.gain);
+    src.connect(hp).connect(bp).connect(g).connect(master);
+    src.start(t);src.stop(t+.9);fl.start(t);fl.stop(t+.9);
+  }
+  function thud(){
+    if(!ac||!$('optSound').checked)return;
+    const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();
+    o.frequency.setValueAtTime(90,t);o.frequency.exponentialRampToValueAtTime(35,t+.4);
+    g.gain.setValueAtTime(.8,t);g.gain.exponentialRampToValueAtTime(.001,t+.5);
+    o.connect(g).connect(master);o.start(t);o.stop(t+.55);
+    const src=ac.createBufferSource(),ng=ac.createGain(),lp=ac.createBiquadFilter();
+    src.buffer=noise;lp.type='lowpass';lp.frequency.value=900;
+    ng.gain.setValueAtTime(.5,t);ng.gain.exponentialRampToValueAtTime(.001,t+.3);
+    src.connect(lp).connect(ng).connect(master);src.start(t);src.stop(t+.35);
+  }
+  // troca de marcha: alívio do turbo + pressão cai e volta a encher
+  function shift(){
+    if(!ac||!$('optSound').checked||game!=='play')return;
+    blowOff(Math.max(.45,boost));boost*=.35;
+  }
+  const getRpm=()=>rpm;
+  return {init,build,update,hiss,thud,setVol,shift,getRpm};
+})();
+function integrate(s,dt){
+  const n=4,h=dt/n;
+  for(let i=0;i<n;i++){
+    const dth=s.v/L1*Math.tan(s.steer);
+    const hvx=s.v*Math.cos(s.th)-C*dth*Math.sin(s.th);
+    const hvy=s.v*Math.sin(s.th)+C*dth*Math.cos(s.th);
+    const dph=(-hvx*Math.sin(s.ph)+hvy*Math.cos(s.ph))/L2;
+    s.P.x+=s.v*Math.cos(s.th)*h; s.P.y+=s.v*Math.sin(s.th)*h;
+    s.th+=dth*h; s.ph+=dph*h;
+  }
+}
+
+// ---------- verificações ----------
+function evaluate(){
+  const bx=bayX(scen.target), pts=[...tractorPoly(st),...trailerPoly(st)];
+  const inside=pts.filter(p=>p.x>=bx-0.05&&p.x<=bx+BAY_W+0.05&&p.y>=BAY_TOP-0.05&&p.y<=BAY_BOT+0.05).length;
+  const want=scen.mode==='frente'?-Math.PI/2:Math.PI/2;
+  const errOk=Math.max(Math.abs(wrap(st.th-want)),Math.abs(wrap(st.ph-want)));
+  const errRev=Math.max(Math.abs(wrap(st.th-want-Math.PI)),Math.abs(wrap(st.ph-want-Math.PI)));
+  return {inside,errOk,errRev};
+}
+function crashed(){
+  const a=tractorPoly(st),b=trailerPoly(st);
+  return scen.obst.some(o=>overlap(a,o)||overlap(b,o));
+}
+
+// ---------- desenho ----------
+function drawTractorBase(s){
+  ctx.save();ctx.translate(s.P.x,s.P.y);ctx.rotate(s.th);
+  ctx.fillStyle='#34373e';ctx.fillRect(-TR_B,-0.95,TR_F+TR_B-0.3,1.9);
+  ctx.fillStyle='#0e0f11';
+  for(const ax of [-0.65,0.65]){ctx.fillRect(ax-0.5,-1.3,1,0.42);ctx.fillRect(ax-0.5,0.88,1,0.42)}
+  ctx.fillStyle='#5b5f68';ctx.beginPath();ctx.arc(C,0,0.7,0,7);ctx.fill();
+  for(const sy of [-1.08,1.08]){
+    ctx.save();ctx.translate(L1,sy);ctx.rotate(s.steer);ctx.fillStyle='#0e0f11';ctx.fillRect(-0.5,-0.2,1,0.4);ctx.restore();
+  }
+  ctx.restore();
+}
+function drawCab(s,color){
+  ctx.save();ctx.translate(s.P.x,s.P.y);ctx.rotate(s.th);
+  ctx.fillStyle=color;ctx.fillRect(2.0,-1.25,2.6,2.5);
+  ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(2.2,-0.95,1.5,1.9);
+  ctx.fillStyle='#162330';ctx.fillRect(4.1,-1.1,0.38,2.2);
+  ctx.fillStyle='#222';ctx.fillRect(3.8,-1.55,0.3,0.3);ctx.fillRect(3.8,1.25,0.3,0.3);
+  ctx.restore();
+}
+function drawTrailer(s,body){
+  const k=kingpin(s);
+  ctx.save();ctx.translate(k.x,k.y);ctx.rotate(s.ph);
+  ctx.fillStyle='#0e0f11';
+  for(const ax of [-L2-1.3,-L2,-L2+1.3]){ctx.fillRect(ax-0.5,-1.42,1,0.3);ctx.fillRect(ax-0.5,1.12,1,0.3)}
+  ctx.fillStyle=body;ctx.fillRect(-TL_B,-TL_W/2,TL_B+TL_F,TL_W);
+  ctx.strokeStyle='rgba(0,0,0,.12)';ctx.lineWidth=0.06;
+  for(let x=-TL_B+1;x<TL_F;x+=1){ctx.beginPath();ctx.moveTo(x,-1.25);ctx.lineTo(x,1.25);ctx.stroke()}
+  ctx.fillStyle='#2f6fd6';ctx.fillRect(-TL_B,-1.3,TL_B+TL_F,0.22);ctx.fillRect(-TL_B,1.08,TL_B+TL_F,0.22);
+  ctx.fillStyle='#7d8691';ctx.fillRect(-TL_B,-1.3,0.3,2.6);
+  ctx.restore();
+}
+function text(str,x,y,sizeM,color,bg){
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);
+  const px=sizeM*scale;ctx.font=`700 ${px}px "Barlow Condensed",sans-serif`;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  const X=x*scale,Y=y*scale;
+  if(bg){const w=ctx.measureText(str).width+px*.6;ctx.fillStyle=bg;ctx.fillRect(X-w/2,Y-px*.62,w,px*1.24)}
+  ctx.fillStyle=color;ctx.fillText(str,X,Y+px*.04);ctx.restore();
+}
+function predict(){
+  const dir=keys.down||st.v<-0.1?-1:(keys.up||st.v>0.1?1:(lastDir||-1));
+  const s={P:{...st.P},th:st.th,ph:st.ph,steer:st.steer,v:dir*2};
+  const pts=[];
+  for(let i=0;i<50;i++){
+    integrate(s,0.1);
+    if(Math.abs(wrap(s.th-s.ph))>JACK)break;
+    const k=kingpin(s);
+    pts.push(dir<0?{x:k.x-TL_B*Math.cos(s.ph),y:k.y-TL_B*Math.sin(s.ph)}
+                  :{x:s.P.x+TR_F*Math.cos(s.th),y:s.P.y+TR_F*Math.sin(s.th)});
+  }
+  return pts;
+}
+let dash=0;
+function draw(){
+  ctx.setTransform(scale,0,0,scale,0,0);
+  ctx.fillStyle='#383b41';ctx.fillRect(0,0,WORLD_W,WORLD_H);
+  ctx.fillStyle='#4a4d54';ctx.fillRect(0,0,WORLD_W,BAY_TOP);
+  // docas
+  ctx.fillStyle='#f2c230';
+  for(let i=0;i<=BAYS;i++)ctx.fillRect(bayX(i)-0.08,BAY_TOP,0.16,BAY_BOT-BAY_TOP);
+  for(let i=0;i<BAYS;i++)text(String(i+1).padStart(2,'0'),bayX(i)+BAY_W/2,BAY_BOT+1.1,1.3,'rgba(242,194,48,.8)');
+  // faixa do corredor
+  ctx.fillStyle='rgba(255,255,255,.25)';
+  for(let x=2;x<WORLD_W;x+=6)ctx.fillRect(x,BAY_BOT+14,3,0.18);
+  // vaga alvo
+  const bx=bayX(scen.target), fr=scen.mode==='frente';
+  ctx.fillStyle='rgba(61,220,151,.13)';ctx.fillRect(bx,BAY_TOP,BAY_W,BAY_BOT-BAY_TOP);
+  ctx.save();ctx.setLineDash([0.8,0.6]);ctx.lineDashOffset=-dash;ctx.strokeStyle='#3ddc97';ctx.lineWidth=0.22;
+  ctx.strokeRect(bx+0.12,BAY_TOP+0.12,BAY_W-0.24,BAY_BOT-BAY_TOP-0.24);ctx.restore();
+  if($('optGuide').checked){
+    ctx.save();ctx.setLineDash([1,1]);ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=0.12;
+    ctx.beginPath();ctx.moveTo(bx+BAY_W/2,BAY_TOP);ctx.lineTo(bx+BAY_W/2,BAY_BOT+14);ctx.stroke();ctx.restore();
+  }
+  // seta no sentido da cabine
+  const cx=bx+BAY_W/2, ay=(BAY_TOP+BAY_BOT)/2, up=fr?-1:1;
+  ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();
+  ctx.moveTo(cx,ay+up*3);ctx.lineTo(cx-1.4,ay+up*1);ctx.lineTo(cx-0.5,ay+up*1);ctx.lineTo(cx-0.5,ay-up*3);
+  ctx.lineTo(cx+0.5,ay-up*3);ctx.lineTo(cx+0.5,ay+up*1);ctx.lineTo(cx+1.4,ay+up*1);ctx.closePath();ctx.fill();
+  text(fr?'FRENTE':'TRASEIRA',cx,BAY_TOP+1.8,1.15,'#15171b',fr?'#3ddc97':'#ff9f43');
+  text(fr?'TRASEIRA':'FRENTE',cx,BAY_BOT-1.4,1.15,'#15171b',fr?'#ff9f43':'#3ddc97');
+  // estacionados
+  for(const p of scen.parked){ if(p.full)drawTractorBase(p.st); drawTrailer(p.st,'#c4c9cf'); if(p.full)drawCab(p.st,p.cab); }
+  // trajetória
+  if($('optPath').checked&&game!=='ready'){
+    ctx.fillStyle='rgba(95,211,255,.85)';
+    predict().forEach((p,i)=>{if(i%2===0){ctx.beginPath();ctx.arc(p.x,p.y,0.2,0,7);ctx.fill()}});
+  }
+  // jogador
+  drawTractorBase(st);drawTrailer(st,'#eef1f4');drawCab(st,'#e2553b');
+}
+
+// ---------- HUD ----------
+function hud(ev){
+  const g=$('gear');
+  g.textContent=st.v<-0.05||(keys.down&&st.v<=0.05)?'R':(st.v>0.05||keys.up)?`D · ${gear}ª`:'N';
+  g.className=shiftT>0?'warn':'';
+  $('spd').textContent=Math.abs(st.v*3.6).toFixed(0)+' km/h';
+  const p=ENGINES[$('engine').value];
+  $('rpm').textContent=Math.round((p.idle+(p.max-p.idle)*audio.getRpm())/50)*50+' rpm';
+  $('knob').style.left=(50+st.steer/MAX_STEER*50)+'%';
+  const art=deg(wrap(st.th-st.ph)), a=$('art');
+  a.textContent=art+'°';a.className=Math.abs(art)>55?'bad':Math.abs(art)>35?'warn':'';
+  const ins=$('ins');ins.textContent=ev.inside+'/8';ins.className=ev.inside===8?'ok':'';
+  const al=$('ali');
+  if(ev.inside>=4){const e=deg(ev.errOk);al.textContent=e+'°';al.className=e<=7?'ok':e<=20?'warn':'bad'}
+  else{al.textContent='–';al.className=''}
+  $('tm').textContent=Math.floor(timer)+'s · '+moves;
+}
+
+// ---------- loop ----------
+let last=0;
+function loop(t){
+  const dt=Math.min(0.05,(t-last)/1000||0);last=t;
+  dash+=dt*1.5;
+  if(game==='play'){
+    timer+=dt;physics(dt);
+    if(crashed()){game='over';audio.thud();show('Bateu!','A carreta encostou em outro veículo ou no muro. Vá mais devagar e acompanhe a traseira.',[['Tentar de novo',retry,1],['Nova vaga',next]])}
+    else if(Math.abs(wrap(st.th-st.ph))>JACK){game='over';show('Canivete!','A carreta dobrou demais em relação ao cavalo (efeito L). Na ré, corrija o volante antes que o ângulo passe de uns 45°.',[['Tentar de novo',retry,1],['Nova vaga',next]])}
+    else{
+      const ev=evaluate(), stopped=Math.abs(st.v)<0.05&&!keys.up&&!keys.down;
+      if(ev.inside===8&&stopped&&(ev.errOk<7*Math.PI/180||ev.errRev<7*Math.PI/180)){
+        holdOk+=dt;
+        if(holdOk>0.6){
+          game='over';
+          if(ev.errOk<7*Math.PI/180){
+            const stars=moves<=2?3:moves<=5?2:1;
+            show('Estacionado!',`${'★'.repeat(stars)}${'☆'.repeat(3-stars)}  ·  ${Math.floor(timer)} s  ·  ${moves} ${moves===1?'manobra':'manobras'}`,[['Próxima vaga',next,1],['Repetir',retry]]);
+          }else{
+            show('Ao contrário',`Você entrou certinho, mas essa vaga pede ${scen.mode==='frente'?'DE FRENTE: a cabine fica no fundo':'DE RÉ: a porta da carreta fica no fundo'}. Olhe as etiquetas FRENTE e TRASEIRA.`,[['Tentar de novo',retry,1],['Nova vaga',next]]);
+          }
+        }
+      }else holdOk=0;
+      hud(ev);
+    }
+  }
+  audio.update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ---------- overlay ----------
+function show(title,msg,btns){
+  $('ovT').textContent=title;$('ovP').textContent=msg;
+  const b=$('ovB');b.innerHTML='';
+  btns.forEach(([label,fn,primary])=>{const e=document.createElement('button');e.textContent=label;if(primary)e.className='primary';e.onclick=fn;b.appendChild(e)});
+  $('ov').hidden=false;b.querySelector('button').focus();
+}
+function play(){ $('ov').hidden=true;game='play'; }
+function retry(){ resetRig();play(); }
+function next(){ newScenario();play(); }
+function intro(){
+  game='ready';
+  const fr=scen.mode==='frente';
+  show('Doca '+String(scen.target+1).padStart(2,'0'),
+    fr?'Estacione DE FRENTE: a cabine vai para o fundo da vaga, onde está escrito FRENTE.'
+      :'Estacione DE RÉ: a porta da carreta vai para o fundo da vaga, onde está escrito TRASEIRA.',
+    [['Começar',play,1]]);
+}
+
+// ---------- controles ----------
+const keyMap={ArrowUp:'up',w:'up',ArrowDown:'down',s:'down',ArrowLeft:'left',a:'left',ArrowRight:'right',d:'right',' ':'brake'};
+addEventListener('pointerdown',()=>audio.init());
+addEventListener('keydown',e=>{
+  audio.init();
+  if(e.target.tagName==='SELECT')return;
+  if(e.key===' '&&e.target.tagName==='BUTTON'&&game!=='play')return;
+  const k=keyMap[e.key.length===1?e.key.toLowerCase():e.key];
+  if(k){keys[k]=true;e.preventDefault();return}
+  if(e.key.toLowerCase()==='r'&&game!=='ready')retry();
+  if(e.key.toLowerCase()==='n'){newScenario();intro()}
+});
+addEventListener('keyup',e=>{const k=keyMap[e.key.length===1?e.key.toLowerCase():e.key];if(k)keys[k]=false});
+addEventListener('blur',()=>{keys={}});
+[['bL','left'],['bR','right'],['bF','up'],['bB','down'],['bK','brake']].forEach(([id,k])=>{
+  const b=$(id);
+  const on=e=>{e.preventDefault();keys[k]=true;b.classList.add('on');try{b.setPointerCapture(e.pointerId)}catch(_){}};
+  const off=()=>{keys[k]=false;b.classList.remove('on')};
+  b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('lostpointercapture',off);
+});
+$('btnNew').onclick=()=>{newScenario();intro()};
+$('mode').onchange=()=>{newScenario();intro()};
+$('engine').onchange=()=>audio.build();
+$('vol').oninput=()=>audio.setVol();
+
+resize();newScenario();hud(evaluate());intro();
+if(document.fonts)document.fonts.ready.then(()=>{});
+requestAnimationFrame(loop);
+</script>
+
+</html>
